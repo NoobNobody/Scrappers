@@ -1,0 +1,106 @@
+import azure.functions as func
+import logging
+import requests
+import re
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+
+def przeksztalc_date(data_publikacji_text):
+    if "dzisiaj" in data_publikacji_text.lower():
+        return datetime.today().date().isoformat()
+    elif "wczoraj" in data_publikacji_text.lower():
+        return (datetime.today() - timedelta(days=1)).date().isoformat()
+    else:
+        dni_temu_match = re.search(r'(\d+) dni', data_publikacji_text)
+        if dni_temu_match:
+            liczba_dni = int(dni_temu_match.group(1))
+            return (datetime.today() - timedelta(days=liczba_dni)).date().isoformat()
+    return None
+
+def scrapp(site_url, database_url):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    driver = webdriver.Chrome(options=chrome_options)
+    while True:
+        page_url = f"{site_url}portal/index.cbop#/listaOfert"
+        driver.get(page_url)
+        try:
+            WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CLASS_NAME, 'oferta-pozycja-kontener-pozycji-min')))
+        except TimeoutException:
+            break
+                      
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+        offers_container = soup.find_all('div', class_='oferta-pozycja-kontener-pozycji-min')
+        all_offers = []
+
+        for container in offers_container:
+            offers = container.find_all('div', class_='dane')
+            all_offers.extend(offers)
+
+        base_url = "https://oferty.praca.gov.pl/portal/index.cbop"
+
+        for index, offer in enumerate(all_offers, 1):
+            position_element = offer.find('span', class_='stanowisko')
+            if not position_element:
+                continue  
+            position = position_element.get_text(strip=True)
+
+            location = (offer.find('span', class_='miejscePracyCzlonPierwszy').get_text(strip=True) + offer.find('span', class_='miejscePracyCzlonDrugi').get_text(strip=True)) if offer.find('span', class_='miejscePracyCzlonPierwszy') and offer.find('span', class_='miejscePracyCzlonDrugi') else None
+
+            job_type = offer.find('span', class_='skroconyRodzajZatrudnienia').get_text(strip=True) if offer.find('span', class_='skroconyRodzajZatrudnienia') else None
+
+            firm = offer.find('span', class_='pracodawca').get_text(strip=True) if offer.find('span', class_='pracodawca') else None
+
+            publication_date_text = offer.find('span', class_='dataDodania').get_text(strip=True) if offer.find('span', class_='dataDodania') else None
+            publication_date = przeksztalc_date(publication_date_text)
+
+            link = offer.find('a', class_='oferta-pozycja-szczegoly-link')['href'] if offer.find('a', class_='oferta-pozycja-szczegoly-link') else None
+            full_link = base_url + link if link else None  
+                 
+            logging.info(f"{position}. Portal: {full_link}")
+
+            offer_data = {
+                "Position": position,
+                "Firm": firm,
+                "Location": location,
+                "Job_type": job_type,
+                "Date": publication_date,
+                "Link": full_link,
+                "Website": site_url,
+                "Website_name": "oferty.praca.gov.pl",
+            }
+
+            requests.post(database_url, json=offer_data)
+
+        next_page_button = driver.find_elements(By.CSS_SELECTOR, 'button.oferta-lista-stronicowanie-nastepna-strona.active')
+        if not next_page_button:
+            break
+            
+
+        driver.execute_script(
+            "var nextPageButton = document.querySelector('button.oferta-lista-stronicowanie-nastepna-strona');"
+            "if (nextPageButton) { nextPageButton.click(); }"
+        )
+
+    driver.quit()
+
+
+ofertypracagov_blueprint = func.Blueprint()
+
+@ofertypracagov_blueprint.timer_trigger(schedule="0 30 20 * * *", arg_name="myTimer", run_on_startup=True,
+              use_monitor=False) 
+def ofertypracagov_timer_trigger(myTimer: func.TimerRequest) -> None:
+    if myTimer.past_due:
+        logging.info('The timer is past due!')
+
+    logging.info('Python OfertyPracaGov timer trigger function executed.')
+    site_url = "https://oferty.praca.gov.pl/"
+    database_url = "http://127.0.0.1:8000/api/ofertypracy/"
+    scrapp(site_url, database_url)
