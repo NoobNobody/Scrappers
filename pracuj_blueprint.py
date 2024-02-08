@@ -1,6 +1,6 @@
 import azure.functions as func
 import logging
-import requests
+from datetime import datetime, timedelta
 import re
 import pyodbc
 from selenium import webdriver
@@ -10,7 +10,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from datetime import datetime
 
 def get_database_connection():
     server = 'joboffers.database.windows.net'
@@ -93,7 +92,8 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
-
+    yesterday = (datetime.today() - timedelta(days=1)).date()
+    
     while True:
         if current_page == 1:
             logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}praca/{category_path}")
@@ -148,6 +148,12 @@ def scrapp(site_url, category_name, category_path):
                         location = lok.a.get_text(strip=True)
                         link = lok.a['href']
 
+                        if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
+                            logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                            return  
+                          
+                        logging.info(f"{position}. Portal: {link}")
+
                         offer_data = {
                             "Position": position,
                             "Firm": firm,
@@ -170,6 +176,12 @@ def scrapp(site_url, category_name, category_path):
                     location = location_element.get_text(strip=True) if location_element else None
                     link = offer.find('a', attrs={'data-test': 'link-offer'})['href'] if offer.find('a', attrs={'data-test': 'link-offer'}) else None
 
+                    if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
+                        logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                        return  
+
+                    logging.info(f"{position}. Portal: {link}")
+
                     offer_data = {
                         "Position": position,
                         "Firm": firm,
@@ -186,8 +198,6 @@ def scrapp(site_url, category_name, category_path):
                     }
                     insert_offer_data(offer_data)
                     logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
-
-                    logging.info(f"{position}. Portal: {link}")
 
         next_page_button = driver.find_elements(By.CSS_SELECTOR, 'button[data-test="bottom-pagination-button-next"]')
         if not next_page_button:

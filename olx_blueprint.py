@@ -86,6 +86,7 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
+    yesterday = (datetime.today() - timedelta(days=1)).date()
 
     while True:
         if current_page == 1:
@@ -103,6 +104,11 @@ def scrapp(site_url, category_name, category_path):
         offers = soup.find_all('div', {'data-cy': 'l-card'})
 
         for offer in offers:
+            top_offer = offer.find('div', {"data-testid": "adCard-featured"})
+            if top_offer:
+                logging.info("Pomijanie oferty wyróżnionej")
+                continue
+
             position_element = offer.find('h6', class_='css-1jmx98l')
             if not position_element:
                 continue  
@@ -132,6 +138,10 @@ def scrapp(site_url, category_name, category_path):
             full_link = site_url + link if link else 'Brak danych'
 
             logging.info(f"{position}. Portal: {full_link}")
+
+            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
+                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                return  
 
             offer_data = {
                 "Position": position,

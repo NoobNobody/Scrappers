@@ -54,22 +54,24 @@ def insert_offer_data(offer_data):
     cursor.close()
     conn.close()
 
-def przeksztalc_date(data_publikacji_text):
-    if "dzisiaj" in data_publikacji_text.lower():
+def transform_date(publication_date_text):
+    if "dzisiaj" in publication_date_text.lower():
         return datetime.today().date().isoformat()
-    elif "wczoraj" in data_publikacji_text.lower():
+    elif "wczoraj" in publication_date_text.lower():
         return (datetime.today() - timedelta(days=1)).date().isoformat()
     else:
-        dni_temu_match = re.search(r'(\d+) dni', data_publikacji_text)
-        if dni_temu_match:
-            liczba_dni = int(dni_temu_match.group(1))
-            return (datetime.today() - timedelta(days=liczba_dni)).date().isoformat()
+        days_ago_match = re.search(r'(\d+) dni', publication_date_text)
+        if days_ago_match:
+            days_num = int(days_ago_match.group(1))
+            return (datetime.today() - timedelta(days=days_num)).date().isoformat()
     return None
 
 def scrapp(site_url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
+    yesterday = (datetime.today() - timedelta(days=1)).date()
+
     while True:
         page_url = f"{site_url}/portal/index.cbop#/listaOfert"
         driver.get(page_url)
@@ -102,13 +104,17 @@ def scrapp(site_url):
             firm = offer.find('span', class_='pracodawca').get_text(strip=True) if offer.find('span', class_='pracodawca') else None
 
             publication_date_text = offer.find('span', class_='dataDodania').get_text(strip=True) if offer.find('span', class_='dataDodania') else None
-            publication_date = przeksztalc_date(publication_date_text)
+            publication_date = transform_date(publication_date_text)
 
             link = offer.find('a', class_='oferta-pozycja-szczegoly-link')['href'] if offer.find('a', class_='oferta-pozycja-szczegoly-link') else None
             full_link = base_url + link if link else None  
                  
             logging.info(f"{position}. Portal: {full_link}")
 
+            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
+                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                return  
+            
             offer_data = {
                 "Position": position,
                 "Location": location,

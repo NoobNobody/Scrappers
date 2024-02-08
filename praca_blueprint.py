@@ -75,6 +75,7 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
+    yesterday = (datetime.today() - timedelta(days=1)).date()
 
     while True:
         if current_page == 1:
@@ -93,6 +94,11 @@ def scrapp(site_url, category_name, category_path):
         offers = soup.find_all('li', class_='listing__item')
 
         for offer in offers:
+            top_offer = offer.find('div', class_='listing__addons')
+            if top_offer and top_offer.find('span', class_='listing__addon', title="Oferta tygodnia"):
+                logging.info("Pomijanie oferty tygodnia")
+                continue 
+
             position_element = offer.find('a', class_='listing__title')
             firm_element = offer.find('a', class_='listing__employer-name')
 
@@ -160,6 +166,10 @@ def scrapp(site_url, category_name, category_path):
 
             logging.info(f"{position}. Portal: {link}")
 
+            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
+                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                return  
+            
             offer_data = {
                 "Position": position,
                 "Firm": firm,
@@ -206,7 +216,7 @@ def praca_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Energetyka": "energetyka-elektronika",
         # "Laboratorium / Farmacja / Biotechnologia": "farmaceutyka-biotechnologia",
         # "Finanse / Ekonomia / Księgowość": "finanse-bankowosc",
-        # "Hotelarstwo / Gastronomia / Turystyka": "gastronomia-catering",
+        "Hotelarstwo / Gastronomia / Turystyka": "gastronomia-catering",
         # "Hotelarstwo / Gastronomia / Turystyka": "turystyka-hotelarstwo",
         # "Reklama / Grafika / Kreacja / Fotografia": "grafika-fotografia-kreacja",
         # "Human Resources / Zasoby ludzkie": "human-resources-kadry",

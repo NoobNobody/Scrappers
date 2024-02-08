@@ -102,6 +102,7 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
+    yesterday = (datetime.today() - timedelta(days=1)).date()
         
     while True:
         if current_page == 1:
@@ -135,6 +136,10 @@ def scrapp(site_url, category_name, category_path):
             publication_date = transform_date(publication_date_text)
 
             firm = get_firm_name(offer)
+
+            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
+                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                return  
             
             logging.info(f"{position}. Portal: {link}")
 

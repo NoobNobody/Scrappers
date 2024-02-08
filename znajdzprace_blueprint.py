@@ -124,7 +124,7 @@ def scrapp(site_url, category_name, category_path):
 
 znajdzprace_blueprint = func.Blueprint()
 
-@znajdzprace_blueprint.timer_trigger(schedule="0 19 18 * * *", arg_name="myTimer", run_on_startup=False,
+@znajdzprace_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def znajdzprace_timer_trigger(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
