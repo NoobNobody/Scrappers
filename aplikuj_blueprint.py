@@ -1,7 +1,7 @@
 import azure.functions as func
 import logging
-import requests
 import re
+import pyodbc
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -10,6 +10,49 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+
+def get_database_connection():
+    server = 'joboffers.database.windows.net'
+    database = 'JobOffersDB'
+    username = 'Nobody'
+    password = 'Karwala1'
+    driver = '{ODBC Driver 17 for SQL Server}'
+    connection_string = f'DRIVER={driver};SERVER=tcp:{server};PORT=1433;DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;'
+    return pyodbc.connect(connection_string)
+
+def get_or_create_website(cursor, website_name, website_url):
+    cursor.execute("SELECT id FROM api_websites WHERE Website_url = ?", (website_url,))
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    else:
+        cursor.execute("INSERT INTO api_websites (Website_name, Website_url) OUTPUT INSERTED.id VALUES (?, ?)", (website_name, website_url))
+        return cursor.fetchone()[0]
+
+def get_or_create_category(cursor, category_name):
+    cursor.execute("SELECT id FROM api_categories WHERE Category_name = ?", (category_name,))
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    else:
+        cursor.execute("INSERT INTO api_categories (Category_name) OUTPUT INSERTED.id VALUES (?)", (category_name,))
+        return cursor.fetchone()[0]
+
+def insert_offer_data(offer_data):
+    conn = get_database_connection()
+    cursor = conn.cursor()
+
+    website_id = get_or_create_website(cursor, offer_data['Website_name'], offer_data['Website'])
+    category_id = get_or_create_category(cursor, offer_data['Category'])
+
+    insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Firm, Earnings, Location, Date, Job_type, Link) 
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+    cursor.execute(insert_query, (
+        offer_data['Position'], website_id, category_id, offer_data['Firm'], offer_data['Earnings'], 
+        offer_data['Location'], offer_data['Date'], offer_data['Job_type'], offer_data['Link']))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 def transform_date(publication_date):
     months = {
@@ -51,7 +94,9 @@ def get_firm_name(offer):
         firm = None
     return firm
 
-def scrapp(site_url, category_name, category_path, database_url):
+
+
+def scrapp(site_url, category_name, category_path):
     logging.info(f"Rozpoczynanie scrapowania kategorii: {category_name}")
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -60,9 +105,9 @@ def scrapp(site_url, category_name, category_path, database_url):
         
     while True:
         if current_page == 1:
-            page_url = f"{site_url}praca/zawody/{category_path}"
+            page_url = f"{site_url}/praca/zawody/{category_path}"
         else:
-            page_url = f"{site_url}praca/zawody/{category_path}/strona-{current_page}"
+            page_url = f"{site_url}/praca/zawody/{category_path}/strona-{current_page}"
 
         driver.get(page_url)
 
@@ -94,19 +139,19 @@ def scrapp(site_url, category_name, category_path, database_url):
             logging.info(f"{position}. Portal: {link}")
 
             offer_data = {
-                "Position": position,
-                "Firm": firm,
-                "Location": location,
-                "Job_type": job_type,
-                "Earnings": earnings,
-                "Date": publication_date,
-                "Link": link,
-                "Website": site_url,
-                "Website_name": "aplikuj.pl",
-                "Category": category_name
-            }
-
-            requests.post(database_url, json=offer_data)
+                    "Position": position,
+                    "Firm": firm,
+                    "Location": location,
+                    "Job_type": job_type,
+                    "Earnings": earnings,
+                    "Date": publication_date,
+                    "Link": link,
+                    "Website": site_url,
+                    "Website_name": "aplikuj",  
+                    "Category": category_name, 
+                }
+            insert_offer_data(offer_data)
+            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
 
 
         next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'a[rel="next"]')
@@ -120,7 +165,7 @@ def scrapp(site_url, category_name, category_path, database_url):
 aplikuj_blueprint = func.Blueprint()
 
 
-@aplikuj_blueprint.timer_trigger(schedule="0 19 18 * * *", arg_name="myTimer", run_on_startup=False,
+@aplikuj_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def aplikuj_timer_trigger(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
@@ -170,7 +215,6 @@ def aplikuj_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Wytwórstwo / Rzemiosło": "wytworstwo-rzemioslo"
     }
 
-    site_url = "https://www.aplikuj.pl/"
-    database_url = "http://127.0.0.1:8000/api/ofertypracy/"
+    site_url = "https://www.aplikuj.pl"
     for category_name, category_path in categories.items():
-        scrapp(site_url, category_name, category_path, database_url)
+        scrapp(site_url, category_name, category_path)

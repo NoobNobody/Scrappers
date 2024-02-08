@@ -1,6 +1,6 @@
 import azure.functions as func
 import logging
-import requests
+import pyodbc
 import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -10,12 +10,56 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
+def get_database_connection():
+    server = 'joboffers.database.windows.net'
+    database = 'JobOffersDB'
+    username = 'Nobody'
+    password = 'Karwala1'
+    driver = '{ODBC Driver 17 for SQL Server}'
+    connection_string = f'DRIVER={driver};SERVER=tcp:{server};PORT=1433;DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;'
+    return pyodbc.connect(connection_string)
+
+def get_or_create_website(cursor, website_name, website_url):
+    cursor.execute("SELECT id FROM api_websites WHERE Website_url = ?", (website_url,))
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    else:
+        cursor.execute("INSERT INTO api_websites (Website_name, Website_url) OUTPUT INSERTED.id VALUES (?, ?)", (website_name, website_url))
+        return cursor.fetchone()[0]
+
+def get_or_create_category(cursor, category_name):
+    cursor.execute("SELECT id FROM api_categories WHERE Category_name = ?", (category_name,))
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    else:
+        cursor.execute("INSERT INTO api_categories (Category_name) OUTPUT INSERTED.id VALUES (?)", (category_name,))
+        return cursor.fetchone()[0]
+
+def insert_offer_data(offer_data):
+    conn = get_database_connection()
+    cursor = conn.cursor()
+
+    website_id = get_or_create_website(cursor, offer_data['Website_name'], offer_data['Website'])
+    category_id = get_or_create_category(cursor, offer_data['Category'])
+
+    insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Earnings, Location, Date, Working_hours, Link) 
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
+    cursor.execute(insert_query, (
+        offer_data['Position'], website_id, category_id, offer_data['Earnings'], 
+        offer_data['Location'], offer_data['Date'], offer_data['Working_hours'], offer_data['Link']))
+    conn.commit()
+    
+    cursor.close()
+    conn.close()
+
 def calculate_date_based_on_page(page_number):
     days_back = (page_number // 5) + (1 if page_number % 20 == 0 else 0)
     date_back = (datetime.datetime.now() - datetime.timedelta(days=days_back)).strftime('%Y-%m-%d')
     return date_back
 
-def scrapp(site_url, category_name, category_path, database_url):
+def scrapp(site_url, category_name, category_path):
     logging.info(f"Rozpoczynanie scrapowania kategorii: {category_name}")
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -25,9 +69,9 @@ def scrapp(site_url, category_name, category_path, database_url):
     while True:
         publication_date = calculate_date_based_on_page(current_page)
         if current_page == 1:
-            page_url = f"{site_url}ogloszenia/?filter-category={category_path}"
+            page_url = f"{site_url}/ogloszenia/?filter-category={category_path}"
         else:
-            page_url = f"{site_url}ogloszenia/page/{current_page}/?filter-category={category_path}"
+            page_url = f"{site_url}/ogloszenia/page/{current_page}/?filter-category={category_path}"
         driver.get(page_url)
 
         try:
@@ -54,7 +98,7 @@ def scrapp(site_url, category_name, category_path, database_url):
             link = offer.find('h2', class_='job-title').find('a')['href'] if offer.find('h2', class_='job-title').find('a') else None
 
             logging.info(f"{position}. Portal: {link}")
-
+            
             offer_data = {
                 "Position": position,
                 "Location": location,
@@ -63,11 +107,12 @@ def scrapp(site_url, category_name, category_path, database_url):
                 "Date": publication_date,
                 "Link": link,
                 "Website": site_url,
-                "Website_name": "znajdzprace.plus",
-                "Category": category_name
+                "Website_name": "znajdzprace",  
+                "Category": category_name, 
             }
+            insert_offer_data(offer_data)
+            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
 
-            requests.post(database_url, json=offer_data)
 
         next_page_exists = driver.find_elements(By.CSS_SELECTOR, '.next.page-numbers')
         if not next_page_exists:
@@ -127,7 +172,6 @@ def znajdzprace_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "157"
     }
 
-    site_url = "https://znajdzprace.plus/"
-    database_url = "http://127.0.0.1:8000/api/ofertypracy/"
+    site_url = "https://znajdzprace.plus"
     for category_name, category_path in categories.items():
-        scrapp(site_url, category_name, category_path, database_url)
+        scrapp(site_url, category_name, category_path)
