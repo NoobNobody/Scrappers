@@ -28,7 +28,7 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
-    yesterday = (datetime.today() - timedelta(days=1)).date()
+    yesterday = (datetime.now() - timedelta(1)).date()
 
     while True:
         if current_page == 1:
@@ -119,34 +119,38 @@ def scrapp(site_url, category_name, category_path):
 
             logging.info(f"{position}. Portal: {link}")
 
-            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
-                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+            check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            if check_date < yesterday:
+                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
-            
-            offer_data = {
-                "Position": position,
-                "Firm": firm,
-                "Location": location,
-                "Job_type": job_type,
-                "Working_hours": working_hours,
-                "Job_model": job_model,
-                "Earnings": earnings,
-                "Date": publication_date,
-                "Link": link,
-                "Website": site_url,
-                "Website_name": "praca",  
-                "Category": category_name, 
-            }
-            insert_offer_data(offer_data)
-            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
+            elif check_date == yesterday:
+                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                offer_data = {
+                    "Position": position,
+                    "Firm": firm,
+                    "Location": location,
+                    "Job_type": job_type,
+                    "Working_hours": working_hours,
+                    "Job_model": job_model,
+                    "Earnings": earnings,
+                    "Date": publication_date,
+                    "Link": link,
+                    "Website": site_url,
+                    "Website_name": "praca",  
+                    "Category": category_name, 
+                }
+                insert_offer_data(offer_data)
+            else:
+                continue
 
-        next_page_button = driver.find_elements(By.CSS_SELECTOR, 'a.pagination__item.pagination__item--next')
-        if not next_page_button:
+        next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'a.pagination__item.pagination__item--next')
+        if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-
         current_page += 1
-    driver.quit()
 
+    driver.quit()
+            
 
 praca_blueprint = func.Blueprint()
 

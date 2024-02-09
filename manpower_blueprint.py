@@ -1,6 +1,6 @@
 import azure.functions as func
 import logging
-import pyodbc
+import os
 from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -9,49 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-
-def get_database_connection():
-    server = 'joboffers.database.windows.net'
-    database = 'JobOffersDB'
-    username = 'Nobody'
-    password = 'Karwala1'
-    driver = '{ODBC Driver 17 for SQL Server}'
-    connection_string = f'DRIVER={driver};SERVER=tcp:{server};PORT=1433;DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;'
-    return pyodbc.connect(connection_string)
-
-def get_or_create_website(cursor, website_name, website_url):
-    cursor.execute("SELECT id FROM api_websites WHERE Website_url = ?", (website_url,))
-    result = cursor.fetchone()
-    if result:
-        return result[0]
-    else:
-        cursor.execute("INSERT INTO api_websites (Website_name, Website_url) OUTPUT INSERTED.id VALUES (?, ?)", (website_name, website_url))
-        return cursor.fetchone()[0]
-
-def get_or_create_category(cursor, category_name):
-    cursor.execute("SELECT id FROM api_categories WHERE Category_name = ?", (category_name,))
-    result = cursor.fetchone()
-    if result:
-        return result[0]
-    else:
-        cursor.execute("INSERT INTO api_categories (Category_name) OUTPUT INSERTED.id VALUES (?)", (category_name,))
-        return cursor.fetchone()[0]
-
-def insert_offer_data(offer_data):
-    conn = get_database_connection()
-    cursor = conn.cursor()
-
-    website_id = get_or_create_website(cursor, offer_data['Website_name'], offer_data['Website'])
-    category_id = get_or_create_category(cursor, offer_data['Category'])
-
-    insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Firm, Location, Date, Job_type, Link) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
-    cursor.execute(insert_query, (
-        offer_data['Position'], website_id, category_id, offer_data['Firm'], offer_data['Location'], offer_data['Date'], offer_data['Job_type'], offer_data['Link']))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
+from database_utils import insert_offer_data
 
 def transform_date(publication_date):
     try:
@@ -66,7 +24,7 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
-    yesterday = (datetime.today() - timedelta(days=1)).date()
+    yesterday = (datetime.now() - timedelta(1)).date()
 
     while True:
         page_url = f"{site_url}/pl/szukaj-pracy?page={current_page}&industries={category_path}"
@@ -99,30 +57,33 @@ def scrapp(site_url, category_name, category_path):
             link = position_element['href'] if position_element else None
             full_link = site_url + link
 
-            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
-                        logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
-                        return  
-            
-            offer_data = {
-                "Position": position,
-                "Firm": "Manpower",
-                "Location": location,
-                "Job_type": job_type,
-                "Date": publication_date,
-                "Link": full_link,
-                "Website": site_url,
-                "Website_name": "manpower",  
-                "Category": category_name, 
-            }
-            insert_offer_data(offer_data)
-            
-            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
+            check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            if check_date < yesterday:
+                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
+                return  
+            elif check_date == yesterday:
+                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                offer_data = {
+                    "Position": position,
+                    "Firm": "Manpower",
+                    "Location": location,
+                    "Job_type": job_type,
+                    "Date": publication_date,
+                    "Link": full_link,
+                    "Website": site_url,
+                    "Website_name": "manpower",  
+                    "Category": category_name, 
+                }
+                insert_offer_data(offer_data)
+            else:
+                continue
 
-        next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'a.page-link.more:not(.disabledCursor)')
+        next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'a.page-link.more')
         if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-        
         current_page += 1
+
     driver.quit()
 
 
@@ -173,6 +134,6 @@ def manpower_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "zdrowie%20uroda%20rekreacja;cc,5035",
     }
 
-    site_url = "https://www.manpower.pl"
+    site_url = os.environ["ManpowerSiteUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

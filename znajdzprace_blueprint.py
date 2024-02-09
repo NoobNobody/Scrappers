@@ -1,6 +1,6 @@
 import azure.functions as func
 import logging
-import datetime
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -12,7 +12,7 @@ from database_utils import insert_offer_data
 
 def calculate_date_based_on_page(page_number):
     days_back = (page_number // 5) + (1 if page_number % 20 == 0 else 0)
-    date_back = (datetime.datetime.now() - datetime.timedelta(days=days_back)).strftime('%Y-%m-%d')
+    date_back = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
     return date_back
 
 def scrapp(site_url, category_name, category_path):
@@ -23,6 +23,7 @@ def scrapp(site_url, category_name, category_path):
     current_page = 1
 
     while True:
+        yesterday = (datetime.now() - timedelta(1)).date()
         publication_date = calculate_date_based_on_page(current_page)
         if current_page == 1:
             page_url = f"{site_url}/ogloszenia/?filter-category={category_path}"
@@ -55,26 +56,35 @@ def scrapp(site_url, category_name, category_path):
 
             logging.info(f"{position}. Portal: {link}")
             
-            offer_data = {
-                "Position": position,
-                "Location": location,
-                "Working_hours": working_hours,
-                "Earnings": earnings,
-                "Date": publication_date,
-                "Link": link,
-                "Website": site_url,
-                "Website_name": "znajdzprace",  
-                "Category": category_name, 
-            }
-            insert_offer_data(offer_data)
-            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
+            check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            if check_date < yesterday:
+                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
+                return  
+            elif check_date == yesterday:
+                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                offer_data = {
+                        "Position": position,
+                        "Location": location,
+                        "Working_hours": working_hours,
+                        "Earnings": earnings,
+                        "Date": publication_date,
+                        "Link": link,
+                        "Website": site_url,
+                        "Website_name": "znajdzprace",  
+                        "Category": category_name, 
+                }
+                insert_offer_data(offer_data)
+            else:
+                continue
 
         next_page_exists = driver.find_elements(By.CSS_SELECTOR, '.next.page-numbers')
         if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-            
         current_page += 1
+
     driver.quit()
+
 
 znajdzprace_blueprint = func.Blueprint()
 

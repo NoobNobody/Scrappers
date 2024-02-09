@@ -1,6 +1,5 @@
 import azure.functions as func
 import logging
-import pyodbc
 import re
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -28,7 +27,7 @@ def scrapp(site_url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
-    yesterday = (datetime.today() - timedelta(days=1)).date()
+    yesterday = (datetime.now() - timedelta(1)).date()
 
     while True:
         page_url = f"{site_url}/portal/index.cbop#/listaOfert"
@@ -69,11 +68,13 @@ def scrapp(site_url):
                  
             logging.info(f"{position}. Portal: {full_link}")
 
-            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
-                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+            check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            if check_date < yesterday:
+                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
-            
-            offer_data = {
+            elif check_date == yesterday:
+                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                offer_data = {
                 "Position": position,
                 "Location": location,
                 "Firm": firm,
@@ -84,24 +85,26 @@ def scrapp(site_url):
                 "Website_name": "oferty.praca.gov",  
                 "Category": "ofertzgov", 
                 }
-            insert_offer_data(offer_data)
-            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
+                insert_offer_data(offer_data)
+            else:
+                continue
 
-        next_page_button = driver.find_elements(By.CSS_SELECTOR, 'button.oferta-lista-stronicowanie-nastepna-strona.active')
-        if not next_page_button:
+        next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'button.oferta-lista-stronicowanie-nastepna-strona.active')
+        if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-            
+
         driver.execute_script(
             "var nextPageButton = document.querySelector('button.oferta-lista-stronicowanie-nastepna-strona');"
             "if (nextPageButton) { nextPageButton.click(); }"
         )
 
-    driver.quit()
+    driver.quit()    
 
 
 ofertypracagov_blueprint = func.Blueprint()
 
-@ofertypracagov_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=True,
+@ofertypracagov_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def ofertypracagov_timer_trigger(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:

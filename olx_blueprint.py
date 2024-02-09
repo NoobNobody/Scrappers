@@ -1,6 +1,5 @@
 import azure.functions as func
 import logging
-import pyodbc
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -42,7 +41,7 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
-    yesterday = (datetime.today() - timedelta(days=1)).date()
+    yesterday = (datetime.now() - timedelta(1)).date()
 
     while True:
         if current_page == 1:
@@ -94,32 +93,35 @@ def scrapp(site_url, category_name, category_path):
             full_link = site_url + link if link else None
 
             logging.info(f"{position}. Portal: {full_link}")
-
-            if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
-                logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+            check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            if check_date < yesterday:
+                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
-
-            offer_data = {
-                "Position": position,
-                "Location": location,
-                "Job_type": job_type,
-                "Job_model": job_model,
-                "Working_hours": working_hours,
-                "Earnings": earnings,
-                "Date": publication_date,
-                "Link": full_link,
-                "Website": site_url,
-                "Website_name": "olx",  
-                "Category": category_name, 
+            elif check_date == yesterday:
+                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                offer_data = {
+                    "Position": position,
+                    "Location": location,
+                    "Job_type": job_type,
+                    "Job_model": job_model,
+                    "Working_hours": working_hours,
+                    "Earnings": earnings,
+                    "Date": publication_date,
+                    "Link": full_link,
+                    "Website": site_url,
+                    "Website_name": "olx",  
+                    "Category": category_name, 
                 }
-            insert_offer_data(offer_data)
-            logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
+                insert_offer_data(offer_data)
+            else:
+                continue
 
         next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'a[data-cy="pagination-forward"]')
         if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-
         current_page += 1
+
     driver.quit()
 
 

@@ -2,7 +2,6 @@ import azure.functions as func
 import logging
 from datetime import datetime, timedelta
 import re
-import pyodbc
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -47,14 +46,14 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
-    yesterday = (datetime.today() - timedelta(days=1)).date()
+    yesterday = (datetime.now() - timedelta(1)).date()
     
     while True:
         if current_page == 1:
-            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}praca/{category_path}")
+            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}/praca/{category_path}")
             page_url = f"{site_url}/praca/{category_path}"
         else:
-            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}praca/{category_path}?pn={current_page}")
+            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}/praca/{category_path}?pn={current_page}")
             page_url = f"{site_url}/praca/{category_path}?pn={current_page}"
 
         driver.get(page_url)
@@ -103,12 +102,40 @@ def scrapp(site_url, category_name, category_path):
                         location = lok.a.get_text(strip=True)
                         link = lok.a['href']
 
-                        if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
-                            logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
+                        check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+                        if check_date < yesterday:
+                            logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                             return  
-                          
-                        logging.info(f"{position}. Portal: {link}")
+                        elif check_date == yesterday:
+                            logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                            offer_data = {
+                                "Position": position,
+                                "Firm": firm,
+                                "Location": location,
+                                "Job_type": job_type,
+                                "Working_hours": working_hours,
+                                "Job_model": job_model,
+                                "Earnings": earnings,
+                                "Date": publication_date,
+                                "Link": link,
+                                "Website": site_url,
+                                "Website_name": "pracuj",  
+                                "Category": category_name, 
+                            }
+                            insert_offer_data(offer_data)
+                        else:
+                            continue
+                    driver.execute_script("document.querySelectorAll('div.tiles_s1g23iln').forEach(button => button.click());")
+                else:
+                    location = location_element.get_text(strip=True) if location_element else None
+                    link = offer.find('a', attrs={'data-test': 'link-offer'})['href'] if offer.find('a', attrs={'data-test': 'link-offer'}) else None
 
+                    check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+                    if check_date < yesterday:
+                        logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
+                        return  
+                    elif check_date == yesterday:
+                        logging.info("Przetwarzanie oferty z wczorajszą datą.")
                         offer_data = {
                             "Position": position,
                             "Firm": firm,
@@ -124,47 +151,21 @@ def scrapp(site_url, category_name, category_path):
                             "Category": category_name, 
                         }
                         insert_offer_data(offer_data)
-                        logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
+                    else:
+                        continue
 
-                    driver.execute_script("document.querySelectorAll('div.tiles_s1g23iln').forEach(button => button.click());")
-                else:
-                    location = location_element.get_text(strip=True) if location_element else None
-                    link = offer.find('a', attrs={'data-test': 'link-offer'})['href'] if offer.find('a', attrs={'data-test': 'link-offer'}) else None
-
-                    if datetime.strptime(publication_date, '%Y-%m-%d').date() < yesterday:
-                        logging.info("Data publikacji jest starsza niż wczorajsza, kończenie scrapowania.")
-                        return  
-
-                    logging.info(f"{position}. Portal: {link}")
-
-                    offer_data = {
-                        "Position": position,
-                        "Firm": firm,
-                        "Location": location,
-                        "Job_type": job_type,
-                        "Working_hours": working_hours,
-                        "Job_model": job_model,
-                        "Earnings": earnings,
-                        "Date": publication_date,
-                        "Link": link,
-                        "Website": site_url,
-                        "Website_name": "pracuj",  
-                        "Category": category_name, 
-                    }
-                    insert_offer_data(offer_data)
-                    logging.info(f"Dane oferty pracy {position} zostały wstawione do bazy danych.") 
-
-        next_page_button = driver.find_elements(By.CSS_SELECTOR, 'button[data-test="bottom-pagination-button-next"]')
-        if not next_page_button:
+        next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'button[data-test="bottom-pagination-button-next"]')
+        if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-
         current_page += 1
+
     driver.quit()
 
 
 pracuj_blueprint = func.Blueprint()
 
-@pracuj_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=False,
+@pracuj_blueprint.timer_trigger(schedule="0 39 21 * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
