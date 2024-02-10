@@ -1,3 +1,4 @@
+import os
 import azure.functions as func
 import logging
 import re
@@ -209,6 +210,6 @@ def praca_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Franczyza / Własny biznes": "franczyza",
     }
 
-    site_url = "https://www.praca.pl"
+    site_url = os.environ["PracaUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

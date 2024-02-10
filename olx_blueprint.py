@@ -1,3 +1,4 @@
+import os
 import azure.functions as func
 import logging
 from selenium import webdriver
@@ -32,7 +33,6 @@ def transform_date(publication_date):
             return date.isoformat()
         except ValueError as e:
             return None
-
 
 
 def scrapp(site_url, category_name, category_path):
@@ -70,7 +70,7 @@ def scrapp(site_url, category_name, category_path):
             position = position_element.get_text(strip=True)
 
             divs = offer.find_all('div', class_='css-9yllbh')
-            earnings = location = working_hours = job_type = 'Brak danych'
+            earnings = location = working_hours = job_type = None
             for div in divs:
                 if div.find('p', class_='css-1hp12oq'):
                     earnings = div.get_text(strip=True)
@@ -94,6 +94,7 @@ def scrapp(site_url, category_name, category_path):
 
             logging.info(f"{position}. Portal: {full_link}")
             check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            
             if check_date < yesterday:
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
@@ -177,6 +178,6 @@ def olx_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Praca dodatkowa": "praca-dodatkowa",
     }
 
-    site_url = "https://www.olx.pl"
+    site_url = os.environ["OLXUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

@@ -1,3 +1,4 @@
+import os
 import azure.functions as func
 import logging
 from datetime import datetime, timedelta
@@ -136,6 +137,6 @@ def znajdzprace_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "157"
     }
 
-    site_url = "https://znajdzprace.plus"
+    site_url = os.environ["ZnajdzPraceUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

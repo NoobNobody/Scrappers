@@ -1,7 +1,8 @@
 import azure.functions as func
 import logging
-from datetime import datetime, timedelta
 import re
+import os
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -211,6 +212,6 @@ def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
         "Pozostałe oferty pracy": "inne;cc,5012",
     }
 
-    site_url = "https://www.pracuj.pl"
+    site_url = os.environ["PracujUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

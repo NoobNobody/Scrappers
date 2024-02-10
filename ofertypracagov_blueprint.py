@@ -1,3 +1,4 @@
+import os
 import azure.functions as func
 import logging
 import re
@@ -111,5 +112,5 @@ def ofertypracagov_timer_trigger(myTimer: func.TimerRequest) -> None:
         logging.info('The timer is past due!')
 
     logging.info('Python OfertyPracaGov timer trigger function executed.')
-    site_url = "https://oferty.praca.gov.pl"
+    site_url = os.environ["OfertyPracaGovUrl"]
     scrapp(site_url)
