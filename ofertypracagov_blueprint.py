@@ -105,7 +105,7 @@ def scrapp(site_url):
 
 ofertypracagov_blueprint = func.Blueprint()
 
-@ofertypracagov_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=True,
+@ofertypracagov_blueprint.timer_trigger(schedule="0 01 00 * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def ofertypracagov_timer_trigger(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
