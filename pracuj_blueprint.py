@@ -51,10 +51,8 @@ def scrapp(site_url, category_name, category_path):
     
     while True:
         if current_page == 1:
-            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}/praca/{category_path}")
             page_url = f"{site_url}/praca/{category_path}"
         else:
-            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}/praca/{category_path}?pn={current_page}")
             page_url = f"{site_url}/praca/{category_path}?pn={current_page}"
 
         driver.get(page_url)
@@ -182,7 +180,7 @@ def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
         # "Budownictwo / Remonty / Geodezja": "budownictwo;cc,5005",
         # "Obsługa klienta i call center": "call%20center;cc,5006",
         # "Doradztwo / Konsulting": "doradztwo%20konsulting;cc,5037",
-        # "Energetyka": "energetyka;cc,5036",
+        "Energetyka": "energetyka;cc,5036",
         # "Nauka / Edukacja / Szkolenia": "edukacja%20szkolenia;cc,5007",
         # "Finanse / Ekonomia / Księgowość": "finanse%20ekonomia;cc,5008",
         # "Franczyza / Własny biznes": "franczyza%20własny%20biznes;cc,5009",
@@ -201,7 +199,7 @@ def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
         # "Praca fizyczna": "praca%20fizyczna;cc,5022",
         # "Prawo": "prawo;cc,5023",
         # "Produkcja": "produkcja;cc,5024",
-        "Public Relations": "public%20relations;cc,5025",
+        # "Public Relations": "public%20relations;cc,5025",
         # "Reklama / Grafika / Kreacja / Fotografia": "reklama%20grafika%20kreacja%20fotografia;cc,5026",
         # "Sektor publiczny": "sektor%20publiczny;cc,5027",
         # "Sprzedaż": "sprzedaż;cc,5028",

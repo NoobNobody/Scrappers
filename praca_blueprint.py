@@ -15,12 +15,14 @@ from database_utils import insert_offer_data
 def transform_date(publication_date):
     days_pattern = re.compile(r'(\d+)\s+(?:dzie[ńn]|dni)')
     days_match = days_pattern.search(publication_date)
-    if days_match:
-        days = int(days_match.group(1))
-        return (datetime.today() - timedelta(days=days)).date().isoformat()
-    elif "godz." in publication_date:
-        return datetime.today().date().isoformat()
-    else:
+    try:
+        if days_match:
+            days = int(days_match.group(1))
+            return (datetime.today() - timedelta(days=days)).date().isoformat()
+        elif "godz." in publication_date:
+            return datetime.today().date().isoformat()
+    except ValueError as e:
+        logging.info(f"Error: {e}")
         return None
     
 def scrapp(site_url, category_name, category_path):
@@ -114,13 +116,22 @@ def scrapp(site_url, category_name, category_path):
                 earnings = None
 
             publication_date_text = offer.find('div', class_='listing__secondary-details listing__secondary-details--with-teaser').get_text(strip=True) if offer.find('div', class_='listing__secondary-details listing__secondary-details--with-teaser') else 'Brak danych'
+
             publication_date = transform_date(publication_date_text)
+            if publication_date is None:
+                logging.info("Data publikacji jest None, pomijanie oferty.")
+                continue
 
-            link = offer.find('a', class_ ='listing__title')['href'] if offer.find('a', class_ ='listing__title') else None
+            link = offer.find('a', class_='listing__title')['href'] if offer.find('a', class_='listing__title') else None
 
-            logging.info(f"{position}. Portal: {link}")
+            logging.info(f"{position}. Portal: {link}, Data: {publication_date}")
 
-            check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            try:
+                check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+                logging.info(f"Sprawdzana data: {check_date}") 
+            except TypeError as e:
+                logging.error(f"Błąd przekształcania daty: {e}, dla daty publikacji: {publication_date}")
+                continue
             if check_date < yesterday:
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
@@ -174,16 +185,16 @@ def praca_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Energetyka": "energetyka-elektronika",
         # "Laboratorium / Farmacja / Biotechnologia": "farmaceutyka-biotechnologia",
         # "Finanse / Ekonomia / Księgowość": "finanse-bankowosc",
-        "Hotelarstwo / Gastronomia / Turystyka": "gastronomia-catering",
+        # "Hotelarstwo / Gastronomia / Turystyka": "gastronomia-catering",
         # "Hotelarstwo / Gastronomia / Turystyka": "turystyka-hotelarstwo",
         # "Reklama / Grafika / Kreacja / Fotografia": "grafika-fotografia-kreacja",
-        # "Human Resources / Zasoby ludzkie": "human-resources-kadry",
+        "Human Resources / Zasoby ludzkie": "human-resources-kadry",
         # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "informatyka-administracja",
-        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "informatyka-programowanie",
+        "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "informatyka-programowanie",
         # "Internet / e-Commerce": "internet-e-commerce",
         # "Inżynieria": "inzynieria-projektowanie",
         # "Kadra kierownicza": "kadra-zarzadzajaca",
-        "Kontrola jakości": "kontrola-jakosci",
+        # "Kontrola jakości": "kontrola-jakosci",
         # "Fryzjerstwo, kosmetyka": "kosmetyka-pielegnacja",
         # "Finanse / Ekonomia / Księgowość": "ksiegowosc-audyt-podatki",
         # "Transport / Spedycja / Logistyka / Kierowca": "logistyka-dystrybucja",
@@ -206,7 +217,7 @@ def praca_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Obsługa klienta i call center": "telekomunikacja",
         # "Tłumaczenia": "tlumaczenia",
         # "Ubezpieczenia": "ubezpieczenia",
-        "Zakupy": "zakupy",
+        # "Zakupy": "zakupy",
         # "Franczyza / Własny biznes": "franczyza",
     }
 

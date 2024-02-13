@@ -102,6 +102,7 @@ def scrapp(site_url, category_name, category_path):
                 logging.info("Przetwarzanie oferty z wczorajszą datą.")
                 offer_data = {
                     "Position": position,
+                    "Firm": None,
                     "Location": location,
                     "Job_type": job_type,
                     "Job_model": job_model,
@@ -138,7 +139,7 @@ def olx_timer_trigger(myTimer: func.TimerRequest) -> None:
 
     categories = {
         # "Administracja biurowa": "administracja-biurowa",
-        "Badania i rozwój": "badania-rozwoj",
+        # "Badania i rozwój": "badania-rozwoj",
         # "Budownictwo / Remonty / Geodezja": "budowa-remonty",
         # "Dostawca, kurier miejski": "dostawca-kurier-miejski",
         # "Internet / e-Commerce": "e-commerce-handel-internetowy",
@@ -168,7 +169,7 @@ def olx_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Rolnictwo i ogrodnictwo": "rolnictwo-i-ogrodnictwo",
         # "Sprzątanie": "sprzatanie",
         # "Sprzedaż": "sprzedaz",
-        # "Wykładanie i ekspozycja towaru": "wykladanie-ekspozycja-towaru",
+        "Wykładanie i ekspozycja towaru": "wykladanie-ekspozycja-towaru",
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "zdrowie",
         # "Pozostałe oferty pracy": "inne-oferty-pracy",
         # "Praktyki / staże": "praktyki-staze",

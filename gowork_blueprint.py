@@ -13,20 +13,15 @@ from datetime import datetime, timedelta
 from database_utils import insert_offer_data
 
 def transform_date(publication_date):
-    logging.info(f"Received date text: {publication_date}")  # Logowanie otrzymanego argumentu
-
     publication_date = publication_date.strip().lower()
     today = datetime.today().date()
     yesterday = today - timedelta(days=1)
     day_before_yesterday = today - timedelta(days=2)
 
-    # Najpierw sprawdź "przedwczoraj"
     if "przedwczoraj" in publication_date:
         transformed_date = day_before_yesterday
-    # Potem "wczoraj"
     elif "wczoraj" in publication_date:
         transformed_date = yesterday
-    # Na końcu "dzisiaj"
     elif "dzisiaj" in publication_date:
         transformed_date = today
     else:
@@ -36,8 +31,6 @@ def transform_date(publication_date):
         except ValueError:
             logging.error(f"Error transforming date: {publication_date}")
             transformed_date = None
-
-    logging.info(f"Transformed date: {transformed_date} for text: '{publication_date}'")
     return transformed_date
 
 def scrapp(site_url, category_name, category_path):
@@ -84,10 +77,12 @@ def scrapp(site_url, category_name, category_path):
             location_element = offer.find('div', class_='g-job-location')
             location = location_element.get_text(strip=True) if location_element else None
 
-            earnings_element = offer.select_one('div.g-job-salary')
+            earnings_element = offer.find('div', class_='g-job-salary')
             if earnings_element:
-                earnings = earnings_element.get_text(strip=True)
-                earnings = earnings.split(" (zal. od typu umowy)")[0]
+                earnings_text = earnings_element.get_text(strip=True).split(" (zal. od typu umowy)")[0]
+                earnings = earnings_text
+            else:
+                earnings = None
 
             divs = offer.find_all("div", class_="g-job-offer-tags")
             job_type = working_hours = job_model = None
@@ -154,11 +149,11 @@ def gowork_timer_trigger(myTimer: func.TimerRequest) -> None:
 
     categories = {
         # "Administracja biurowa": "administracja-biurowa",
-        # "Badania i rozwój": "badania-i-rozwoj",
+        "Badania i rozwój": "badania-i-rozwoj",
         # "Finanse / Ekonomia / Księgowość": "bankowosc",
         # "BHP / Ochrona środowiska": "bhp-ochrona-srodowiska-rolnictwo",
         # "Budownictwo / Remonty / Geodezja": "budownictwo",
-        # "Obsługa klienta i call center": "call-center",
+        "Obsługa klienta i call center": "call-center",
         # "Nauka / Edukacja / Szkolenia": "edukacja-szkolenia",
         # "Finanse / Ekonomia / Księgowość": "finanse-ksiegowosc",
         # "Praca fizyczna": "fizyczna",
@@ -166,7 +161,7 @@ def gowork_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Reklama / Grafika / Kreacja / Fotografia": "grafika-kreacja-fotografia",
         # "Hotelarstwo / Gastronomia / Turystyka": "hotelarstwo-gastronomia-turystyka",
         # "HR": "hr-kadry-i-place",
-        "Inżynieria": "inzynieria",
+        # "Inżynieria": "inzynieria",
         # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "it",
         # "Kadra kierownicza": "kadra-zarzadzajaca",
         # "Kontrola jakości": "kontrola-jakosci",
