@@ -1,3 +1,4 @@
+import os
 import azure.functions as func
 import logging
 import re
@@ -50,7 +51,6 @@ def get_firm_name(offer):
     else:
         firm = None
     return firm
-
 
 
 def scrapp(site_url, category_name, category_path):
@@ -154,7 +154,7 @@ def aplikuj_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "telekomunikacja",
         # "Kadra kierownicza": "zarzadzanie-dyrekcja",
         # "Marketing i PR": "media-pr-reklama-marketing",
-        "Media / Sztuka / Rozrywka": "sztuka-rozrywka-kreacja-projektowanie",
+        # "Media / Sztuka / Rozrywka": "sztuka-rozrywka-kreacja-projektowanie",
         # "Motoryzacja": "motoryzacja",
         # "Motoryzacja": "serwis-montaz",
         # "Nieruchomości": "nieruchomosci",
@@ -170,13 +170,13 @@ def aplikuj_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Sprzedaż": "sprzedaz-zakupy",
         # "Sport": "rekreacja-i-sport",
         # "Transport / Spedycja / Logistyka / Kierowca": "logistyka-spedycja-transport",
-        "Ubezpieczenia": "ubezpieczenia",
+        # "Ubezpieczenia": "ubezpieczenia",
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "medycyna-farmacja-zdrowie",
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "uroda-pielegnacja-dietetyka",
         # "Pozostałe oferty pracy": "inne",
         # "Wytwórstwo / Rzemiosło": "wytworstwo-rzemioslo"
     }
 
-    site_url = "https://www.aplikuj.pl"
+    site_url = os.environ["AplikujSiteUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

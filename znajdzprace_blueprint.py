@@ -1,3 +1,4 @@
+import os
 import azure.functions as func
 import logging
 from datetime import datetime, timedelta
@@ -11,7 +12,8 @@ from bs4 import BeautifulSoup
 from database_utils import insert_offer_data
 
 def calculate_date_based_on_page(page_number):
-    days_back = (page_number // 5) + (1 if page_number % 20 == 0 else 0)
+    limit_page_number = 30
+    days_back = min((page_number - 1) // 5, (limit_page_number - 1) // 5)
     date_back = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
     return date_back
 
@@ -21,9 +23,9 @@ def scrapp(site_url, category_name, category_path):
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
+    today = datetime.now().date()
 
     while True:
-        yesterday = (datetime.now() - timedelta(1)).date()
         publication_date = calculate_date_based_on_page(current_page)
         if current_page == 1:
             page_url = f"{site_url}/ogloszenia/?filter-category={category_path}"
@@ -54,13 +56,14 @@ def scrapp(site_url, category_name, category_path):
 
             link = offer.find('h2', class_='job-title').find('a')['href'] if offer.find('h2', class_='job-title').find('a') else None
 
-            logging.info(f"{position}. Portal: {link}")
+            logging.info(f"Pozycja: {position}. Link: {link} , Data: {publication_date}")
             
             check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
-            if check_date < yesterday:
+            logging.info(f"Check date: {check_date}")
+            if check_date < today:
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
-            elif check_date == yesterday:
+            elif check_date == today:
                 logging.info("Przetwarzanie oferty z wczorajszą datą.")
                 offer_data = {
                         "Position": position,
@@ -98,12 +101,12 @@ def znajdzprace_timer_trigger(myTimer: func.TimerRequest) -> None:
 
     categories = {
         # "Administracja biurowa": "43",
-        # "Badania i rozwój": "30",
+        "Badania i rozwój": "30",
         # "Budownictwo / Remonty / Geodezja": "46",
         # "Dostawca, kurier miejski": "51",
         # "Internet / e-Commerce": "59",
         # "Nauka / Edukacja / Szkolenia": "66",
-        # "Energetyka": "68",
+        "Energetyka": "68",
         # "Finanse / Ekonomia / Księgowość": "80",
         # "Franczyza / Własny biznes": "93",
         # "Fryzjerstwo, kosmetyka": "134",
@@ -126,16 +129,16 @@ def znajdzprace_timer_trigger(myTimer: func.TimerRequest) -> None:
         # "Praca dodatkowa": "159",
         # "Praca za granicą": "149",
         # "Prace magazynowe": "150",
-        "Pracownik sklepu": "151",
+        # "Pracownik sklepu": "151",
         # "Praktyki / staże": "160",
         # "Produkcja": "152",
         # "Rolnictwo i ogrodnictwo": "153",
         # "Sprzątanie": "154",
         # "Sprzedaż": "155",
-        "Wykładanie i ekspozycja towaru": "156",
+        # "Wykładanie i ekspozycja towaru": "156",
         # "Medycyna / Zdrowie / Uroda / Rekreacja": "157"
     }
 
-    site_url = "https://znajdzprace.plus"
+    site_url = os.environ["ZnajdzPraceUrl"]
     for category_name, category_path in categories.items():
         scrapp(site_url, category_name, category_path)

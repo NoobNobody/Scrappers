@@ -37,7 +37,7 @@ def scrapp(site_url, category_name, category_path):
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         offers = soup.find_all('div', class_='card-body')
-        LICZNIK = 0
+        
         for offer in offers:
 
             position_element = offer.select_one('.job-position h2.title a')
@@ -58,6 +58,8 @@ def scrapp(site_url, category_name, category_path):
             full_link = site_url + link
 
             check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+            logging.info(f"Data: {check_date}")
+
             if check_date < yesterday:
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
@@ -98,40 +100,31 @@ def manpower_timer_trigger(myTimer: func.TimerRequest) -> None:
     logging.info('Python Manpower timer trigger function executed.')
 
     categories = {
-        "Produkcja": "Produkcja&ids={industries:[8f5b8e3a160e42f0914077c3d2550420]}&sf=industries",
-        # "Administracja biurowa": "administracja%20biurowa;cc,5001",
-        # "Badania i rozwój": "badania%20i%20rozwój;cc,5002",
-        # "Bankowość": "bankowość;cc,5003",
-        # "BHP / Ochrona środowiska": "bhp%20ochrona%20środowiska;cc,5004",
-        # "Budownictwo / Remonty / Geodezja": "budownictwo;cc,5005",
-        # "Obsługa klienta i call center": "call%20center;cc,5006",
-        # "Doradztwo / Konsulting": "doradztwo%20konsulting;cc,5037",
-        # "Energetyka": "energetyka;cc,5036",
-        # "Nauka / Edukacja / Szkolenia": "edukacja%20szkolenia;cc,5007",
-        # "Finanse / Ekonomia / Księgowość": "finanse%20ekonomia;cc,5008",
-        # "Franczyza / Własny biznes": "franczyza%20własny%20biznes;cc,5009",
-        # "Hotelarstwo / Gastronomia / Turystyka": "hotelarstwo%20gastronomia%20turystyka;cc,5010",
-        # "Human Resources / Zasoby ludzkie": "human%20resources%20zasoby%20ludzkie;cc,5011",
-        # "Internet / e-Commerce": "internet%20e-commerce%20nowe%20media;cc,5013",
-        "Inżynieria": "Inżynieria&ids={industries:[3858bb14bb7245df970dd015c64c7c65]}&sf=industries",
-        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "it%20-%20administracja;cc,5015",
-        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "it%20-%20rozwój%20oprogramowania;cc,5016",
-        # "Kontrola jakości": "kontrola%20jakości;cc,5034",
-        # "Łańcuch dostaw": "łańcuch%20dostaw;cc,5017",
-        # "Marketing i PR": "marketing;cc,5018",
-        # "Media / Sztuka / Rozrywka": "media%20sztuka%20rozrywka;cc,5019",
-        # "Nieruchomości": "nieruchomości;cc,5020",
-        # "Obsługa klienta i call center": "obsługa%20klienta;cc,5021",
-        # "Praca fizyczna": "praca%20fizyczna;cc,5022",
-        # "Prawo": "prawo;cc,5023",
+        # "Produkcja": "Produkcja&ids={industries:[8f5b8e3a160e42f0914077c3d2550420]}&sf=industries",
         "Prace magazynowe": "Magazyn&ids={industries:[d4c6348f2d9e4650929160ca7715a71a]}&sf=industries",
-        # "Reklama / Grafika / Kreacja / Fotografia": "reklama%20grafika%20kreacja%20fotografia;cc,5026",
-        # "Sektor publiczny": "sektor%20publiczny;cc,5027",
-        "Sprzedaż": "Sprzedaż&ids={industries:[c2d78c75e85746be959ee87dcb524d77]}&sf=industries",
-        # "Transport / Spedycja / Logistyka / Kierowca": "transport%20spedycja%20logistyka;cc,5031",
-        # "Ubezpieczenia": "ubezpieczenia;cc,5032",
-        # "Zakupy": "zakupy;cc,5033",
-        # "Medycyna / Zdrowie / Uroda / Rekreacja": "zdrowie%20uroda%20rekreacja;cc,5035",
+        "Inżynieria": "Inżynieria&ids={industries:[3858bb14bb7245df970dd015c64c7c65]}&sf=industries",
+        # "Obsługa klienta i call center": "Obsługa+klienta&ids={industries:[7f52a86281d2493ca2f950c62d87c44f]}&sf=industries",
+        # "Sprzedaż": "Sprzedaż&ids={industries:[c2d78c75e85746be959ee87dcb524d77]}&sf=industries",
+        # "Finanse / Ekonomia / Księgowość": "Finanse&ids={industries:[e1ff6be96a264eeabda19ea922d64b93]}&sf=industries",
+        # "Finanse / Ekonomia / Księgowość": "Księgowość+&ids={industries:[f4f1345a7bd54d588295a5b89326ea86]}&sf=industries",
+        # "Transport / Spedycja / Logistyka / Kierowca": "Logistyka+i+zaopatrzenie&ids={industries:[c3249aa827fb42e6b6102e41e0731430]}&sf=industries",
+        # "Transport / Spedycja / Logistyka / Kierowca": "Kierowca&ids={industries:[4e729d2dfed24e51a89d930da706b2d4]}&sf=industries",
+        # "HR": "HR&ids={industries:[938e32cd5eea48cd814d1cd09c17dec1]}&sf=industries",
+        # "Administracja biurowa": "Biuro&ids={industries:[ef4874de00eb49379339cec4be76418b]}&sf=industries",
+        # "Internet / e-Commerce": "E-commerce&ids={industries:[a7a2772f82fd41ceb64560ff4d7ed27a]}&sf=industries",
+        # "Budownictwo / Remonty / Geodezja": "Budownictwo&ids={industries:[62d1cdbd8f774f53a464d1fa6666ce1f]}&sf=industries",
+        # "Medycyna / Zdrowie / Uroda / Rekreacja": "Medycyna&ids={industries:[579992e91a47475a91ab8193e27ae5f3]}&sf=industries",
+        # "Medycyna / Zdrowie / Uroda / Rekreacja": "Farmacja&ids={industries:[f9f5a5be8c884f5886c4a027196baf5a]}&sf=industries",
+        # "Zakupy": "Zakupy&ids={industries:[e5a11db64c354da7bb0e0aabaf7ca3d1]}&sf=industries",
+        # "Prawo": "Prawo&ids={industries:[588974fea5814ebdb5ba57dab7a0e45f]}&sf=industries",
+        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "IT&ids={industries:[2057c2d9aaa845f5a15403dbb98d1018]}&sf=industries",
+        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "Zarządzanie+projektami&ids={industries:[77a9519120d54d06b9ac999b2cfb4baf]}&sf=industries",
+        # "Pracownik sklepu": "Handel+detaliczny&ids={industries:[c9e415c0e7af4f1288ab80007652aaeb]}&sf=industries",
+        # "Marketing i PR": "Marketing&ids={industries:[0a7f506a5f294e1b842c7b316abfc29e]}&sf=industries",
+        # "Ubezpieczenia": "Ubezpieczenia&ids={industries:[7f243c710cb24c6bb650976636546294]}&sf=industries",
+        # "Finanse / Ekonomia / Księgowość": "Podatki&ids={industries:[d3f1b0dd0f134d078ad72c6d8b851be6]}&sf=industries",
+        # "Laboratorium / Farmacja / Biotechnologia": "Biotechnologia&ids={industries:[590025215e3f43438db5ba0e75d35b1e]}&sf=industries",
+        # "Laboratorium / Farmacja / Biotechnologia": "Laboratorium&ids={industries:[e2ed731a5ed8462d999bfcfca7cb1432]}&sf=industries"
     }
 
     site_url = os.environ["ManpowerSiteUrl"]
