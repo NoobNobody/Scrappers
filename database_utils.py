@@ -3,13 +3,35 @@ import pyodbc
 import os
 
 def get_database_connection():
-    server = os.environ['DBServer']
-    database = os.environ['DBName']
-    username = os.environ['DBUsername']
-    password = os.environ['DBPassword']
-    driver = '{ODBC Driver 18 for SQL Server}'
-    connection_string = f'DRIVER={driver};SERVER=tcp:{server};PORT=1433;DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;'
-    return pyodbc.connect(connection_string)
+    try:
+        server = os.environ['DBServer']
+        database = os.environ['DBName']
+        username = os.environ['DBUsername']
+        password = os.environ['DBPassword']
+        driver = '{ODBC Driver 18 for SQL Server}'
+        connection_string = f'DRIVER={driver};SERVER=tcp:{server};PORT=1433;DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;'
+        return pyodbc.connect(connection_string)
+    except Exception as ex:
+        logging.error(f"Exception: {ex}")
+
+def get_records(query, params):
+    try:
+        connection = get_database_connection()
+        cursor = connection.cursor()
+        cursor.execute(query, params)
+        result = cursor.fetchone()
+        return result
+    except Exception as e:
+        logging.error(f"Błąd podczas pobierania strony: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+
+def insert_records(query, params):
+    try:
+        connection = get_database_connection()
+    except Exception as e:
+        logging.error(f"Błąd podczas pobierania strony: {e}")
 
 def get_website(website_url):
     try:
@@ -89,7 +111,7 @@ def insert_offer_data(offer_data):
             category_id = category_result[0]
 
         logging.info(f"Próba wstawienia danych oferty pracy: {offer_data['Position']}")
-
+    
         values = [offer_data['Position'], website_id, category_id] + [offer_data.get(key) for key in ('Firm', 'Earnings', 'Location', 'Date', 'Job_type', 'Working_hours', 'Job_model', 'Link')]
         insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Firm, Earnings, Location, Date, Job_type, Working_hours, Job_model, Link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
         cursor.execute(insert_query, tuple(values))
