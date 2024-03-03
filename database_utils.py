@@ -88,8 +88,8 @@ def insert_offer_data(offer_data):
 
         logging.info(f"Próba wstawienia danych oferty pracy: {offer_data['Position']}")
 
-        values = [offer_data['Position'], website_id, category_id] + [offer_data.get(key) for key in ('Firm', 'Earnings', 'Location', 'Date', 'Job_type', 'Working_hours', 'Job_model', 'Link')]
-        insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Firm, Earnings, Location, Date, Job_type, Working_hours, Job_model, Link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+        values = [offer_data['Position'], website_id, category_id] + [offer_data.get(key) for key in ('Firm', 'Earnings', 'Location', 'Location_Latitude', 'Location_Longitude', 'Province', 'Min_Earnings', 'Max_Earnings', 'Average_Earnings', 'Earnings_Type', 'Date', 'Job_type', 'Working_hours', 'Job_model', 'Link')]
+        insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Firm, Earnings, Location, Location_Latitude,Location_Longitude, Province, Min_Earnings, Max_Earnings, Average_Earnings, Earnings_Type, Date, Job_type, Working_hours, Job_model, Link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
         cursor.execute(insert_query, tuple(values))
         connection.commit()
         logging.info(f"Dane oferty pracy {offer_data['Position']} zostały pomyślnie wstawione do bazy danych.")
