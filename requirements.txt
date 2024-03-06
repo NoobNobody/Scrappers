@@ -6,3 +6,5 @@ azure-functions
 beautifulsoup4
 requests
 selenium
+pyodbc
+geopy

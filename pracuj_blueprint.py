@@ -1,7 +1,8 @@
 import azure.functions as func
 import logging
-import requests
 import re
+import os
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -9,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from datetime import datetime
+from database_utils import insert_offer_data
 
 def transform_date(publication_date):
     months = {
@@ -39,20 +40,20 @@ def transform_date(publication_date):
     except ValueError as e:
         return None
 
-def scrapp(site_url, category_name, category_path, database_url):
+
+def scrapp(site_url, category_name, category_path):
     logging.info(f"Rozpoczynanie scrapowania kategorii: {category_name}")
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(options=chrome_options)
     current_page = 1
-
+    yesterday = (datetime.now() - timedelta(1)).date()
+    
     while True:
         if current_page == 1:
-            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}praca/{category_path}")
-            page_url = f"{site_url}praca/{category_path}"
+            page_url = f"{site_url}/praca/{category_path}"
         else:
-            logging.info(f"Rozpoczęcie scrapowania kategorii: {category_name} z URL: {site_url}praca/{category_path}?pn={current_page}")
-            page_url = f"{site_url}praca/{category_path}?pn={current_page}"
+            page_url = f"{site_url}/praca/{category_path}?pn={current_page}"
 
         driver.get(page_url)
 
@@ -100,6 +101,40 @@ def scrapp(site_url, category_name, category_path, database_url):
                         location = lok.a.get_text(strip=True)
                         link = lok.a['href']
 
+                        check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+                        if check_date < yesterday:
+                            logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
+                            return  
+                        elif check_date == yesterday:
+                            logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                            offer_data = {
+                                "Position": position,
+                                "Firm": firm,
+                                "Location": location,
+                                "Job_type": job_type,
+                                "Working_hours": working_hours,
+                                "Job_model": job_model,
+                                "Earnings": earnings,
+                                "Date": publication_date,
+                                "Link": link,
+                                "Website": site_url,
+                                "Website_name": "pracuj",  
+                                "Category": category_name, 
+                            }
+                            insert_offer_data(offer_data)
+                        else:
+                            continue
+                    driver.execute_script("document.querySelectorAll('div.tiles_s1g23iln').forEach(button => button.click());")
+                else:
+                    location = location_element.get_text(strip=True) if location_element else None
+                    link = offer.find('a', attrs={'data-test': 'link-offer'})['href'] if offer.find('a', attrs={'data-test': 'link-offer'}) else None
+
+                    check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
+                    if check_date < yesterday:
+                        logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
+                        return  
+                    elif check_date == yesterday:
+                        logging.info("Przetwarzanie oferty z wczorajszą datą.")
                         offer_data = {
                             "Position": position,
                             "Firm": firm,
@@ -111,47 +146,25 @@ def scrapp(site_url, category_name, category_path, database_url):
                             "Date": publication_date,
                             "Link": link,
                             "Website": site_url,
-                            "Website_name": "pracuj.pl",
-                            "Category": category_name
+                            "Website_name": "pracuj",  
+                            "Category": category_name, 
                         }
+                        insert_offer_data(offer_data)
+                    else:
+                        continue
 
-                        requests.post(database_url, json=offer_data)
-
-                    driver.execute_script("document.querySelectorAll('div.tiles_s1g23iln').forEach(button => button.click());")
-                else:
-                    location = location_element.get_text(strip=True) if location_element else None
-                    link = offer.find('a', attrs={'data-test': 'link-offer'})['href'] if offer.find('a', attrs={'data-test': 'link-offer'}) else None
-
-                    offer_data = {
-                        "Position": position,
-                        "Firm": firm,
-                        "Location": location,
-                        "Job_type": job_type,
-                        "Working_hours": working_hours,
-                        "Job_model": job_model,
-                        "Earnings": earnings,
-                        "Date": publication_date,
-                        "Link": link,
-                        "Website": site_url,
-                        "Website_name": "pracuj.pl",
-                        "Category": category_name
-                    }
-
-                    requests.post(database_url, json=offer_data)
-
-                    logging.info(f"{position}. Portal: {link}")
-
-        next_page_button = driver.find_elements(By.CSS_SELECTOR, 'button[data-test="bottom-pagination-button-next"]')
-        if not next_page_button:
+        next_page_exists = driver.find_elements(By.CSS_SELECTOR, 'button[data-test="bottom-pagination-button-next"]')
+        if not next_page_exists:
+            logging.info("Brak kolejnych stron, kończenie scrapowania.")
             break
-
         current_page += 1
+
     driver.quit()
 
 
 pracuj_blueprint = func.Blueprint()
 
-@pracuj_blueprint.timer_trigger(schedule="0 51 19 * * *", arg_name="myTimer", run_on_startup=False,
+@pracuj_blueprint.timer_trigger(schedule="0 39 21 * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
@@ -167,7 +180,7 @@ def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
         # "Budownictwo / Remonty / Geodezja": "budownictwo;cc,5005",
         # "Obsługa klienta i call center": "call%20center;cc,5006",
         # "Doradztwo / Konsulting": "doradztwo%20konsulting;cc,5037",
-        # "Energetyka": "energetyka;cc,5036",
+        "Energetyka": "energetyka;cc,5036",
         # "Nauka / Edukacja / Szkolenia": "edukacja%20szkolenia;cc,5007",
         # "Finanse / Ekonomia / Księgowość": "finanse%20ekonomia;cc,5008",
         # "Franczyza / Własny biznes": "franczyza%20własny%20biznes;cc,5009",
@@ -186,7 +199,7 @@ def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
         # "Praca fizyczna": "praca%20fizyczna;cc,5022",
         # "Prawo": "prawo;cc,5023",
         # "Produkcja": "produkcja;cc,5024",
-        "Public Relations": "public%20relations;cc,5025",
+        # "Public Relations": "public%20relations;cc,5025",
         # "Reklama / Grafika / Kreacja / Fotografia": "reklama%20grafika%20kreacja%20fotografia;cc,5026",
         # "Sektor publiczny": "sektor%20publiczny;cc,5027",
         # "Sprzedaż": "sprzedaż;cc,5028",
@@ -197,7 +210,6 @@ def pracuj_time_trigger(myTimer: func.TimerRequest) -> None:
         "Pozostałe oferty pracy": "inne;cc,5012",
     }
 
-    site_url = "https://www.pracuj.pl/"
-    database_url = "http://127.0.0.1:8000/api/ofertypracy/"
+    site_url = os.environ["PracujUrl"]
     for category_name, category_path in categories.items():
-        scrapp(site_url, category_name, category_path, database_url)
+        scrapp(site_url, category_name, category_path)

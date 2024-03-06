@@ -6,6 +6,8 @@ from pracuj_blueprint import pracuj_blueprint as bp2
 from aplikuj_blueprint import aplikuj_blueprint as bp3
 from znajdzprace_blueprint import znajdzprace_blueprint as bp4
 from ofertypracagov_blueprint import ofertypracagov_blueprint as bp5
+from manpower_blueprint import manpower_blueprint as bp6
+from gowork_blueprint import gowork_blueprint as bp7
 
 app = func.FunctionApp()
 app.register_functions(bp)
@@ -14,3 +16,5 @@ app.register_functions(bp2)
 app.register_functions(bp3)
 app.register_functions(bp4)
 app.register_functions(bp5)
+app.register_functions(bp6)
+app.register_functions(bp7)
