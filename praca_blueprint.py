@@ -11,6 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from database_utils import insert_offer_data
+from helping_functions import get_earnings_type, get_location_details, get_province, parse_earnings
 
 def transform_date(publication_date):
     days_pattern = re.compile(r'(\d+)\s+(?:dzie[ńn]|dni)')
@@ -40,6 +41,7 @@ def scrapp(site_url, category_name, category_path):
             page_url = f"{site_url}/{category_path}_{current_page}.html"
 
         driver.get(page_url)
+        logging.info(f"Aktualna strona: {page_url}")
 
         try:
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CLASS_NAME, 'listing__item')))
@@ -73,6 +75,9 @@ def scrapp(site_url, category_name, category_path):
             else:
                 location_text = None
             location = location_text
+
+            location_details = get_location_details(location)
+            province = get_province(location)
 
             working_hours = offer.find('li', attrs={'data-test': 'offer-additional-info-1'}).get_text(strip=True) if offer.find('li', attrs={'data-test': 'offer-additional-info-1'}) else None
 
@@ -115,6 +120,9 @@ def scrapp(site_url, category_name, category_path):
                 working_hours = None
                 earnings = None
 
+            min_earnings, max_earnings, average_earnings, _ = parse_earnings(earnings)
+            earnings_type = get_earnings_type(min_earnings, max_earnings)
+
             publication_date_text = offer.find('div', class_='listing__secondary-details listing__secondary-details--with-teaser').get_text(strip=True) if offer.find('div', class_='listing__secondary-details listing__secondary-details--with-teaser') else 'Brak danych'
 
             publication_date = transform_date(publication_date_text)
@@ -124,27 +132,31 @@ def scrapp(site_url, category_name, category_path):
 
             link = offer.find('a', class_='listing__title')['href'] if offer.find('a', class_='listing__title') else None
 
-            logging.info(f"{position}. Portal: {link}, Data: {publication_date}")
-
             try:
                 check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
-                logging.info(f"Sprawdzana data: {check_date}") 
             except TypeError as e:
                 logging.error(f"Błąd przekształcania daty: {e}, dla daty publikacji: {publication_date}")
                 continue
             if check_date < yesterday:
-                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
+                logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej kategorii.")
                 return  
             elif check_date == yesterday:
-                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                logging.info(f"Oferta: Position: {position}, Location: {location}, Earnings: {earnings}, Date: {publication_date}")
                 offer_data = {
                     "Position": position,
                     "Firm": firm,
                     "Location": location,
+                    "Location_Latitude": location_details['latitude'],
+                    "Location_Longitude": location_details['longitude'],
+                    "Province": province,
                     "Job_type": job_type,
                     "Working_hours": working_hours,
                     "Job_model": job_model,
                     "Earnings": earnings,
+                    "Min_Earnings": min_earnings,
+                    "Max_Earnings": max_earnings,
+                    "Average_Earnings": average_earnings,
+                    "Earnings_Type": earnings_type,
                     "Date": publication_date,
                     "Link": link,
                     "Website": site_url,
@@ -152,6 +164,7 @@ def scrapp(site_url, category_name, category_path):
                     "Category": category_name, 
                 }
                 insert_offer_data(offer_data)
+                logging.info("Wyslano do bazy danych!")
             else:
                 continue
 
