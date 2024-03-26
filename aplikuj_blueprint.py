@@ -77,6 +77,7 @@ def scrapp(site_url, category_name, category_path):
             page_url = f"{site_url}/praca/zawody/{category_path}/strona-{current_page}"
 
         driver.get(page_url)
+        logging.info(f"Aktualna strona: {page_url}")
 
         try:
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CLASS_NAME, 'offer-card-main-wrapper')))
@@ -93,7 +94,6 @@ def scrapp(site_url, category_name, category_path):
             location = offer.find('li', class_='offer-card-labels-list-item--workPlace').get_text(strip=True)
 
             location_details = get_location_details(location)
-            
             province = get_province(location)
 
             job_type = offer.find('li', class_='offer-card-labels-list-item--employmentType').get_text(strip=True)
@@ -115,7 +115,7 @@ def scrapp(site_url, category_name, category_path):
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
             elif check_date == yesterday:
-                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                logging.info(f"Oferta: Position: {position}, Location: {location}, Earnings: {earnings}, Date: {publication_date}")
                 offer_data = {
                     "Position": position,
                     "Firm": firm,
@@ -136,6 +136,7 @@ def scrapp(site_url, category_name, category_path):
                     "Category": category_name, 
                 }
                 insert_offer_data(offer_data)
+                logging.info("Wyslano do bazy danych!")
             else:
                 continue
 
@@ -159,35 +160,35 @@ def aplikuj_timer_trigger(myTimer: func.TimerRequest) -> None:
     logging.info('Python Aplikuj timer trigger function executed.')
 
     categories = {
-        "Administracja biurowa": "administracja-biurowa-praca-biurowa",
-        "Badania i rozwój": "badania-i-rozwoj",
-        "Bankowość": "bankowosc-finanse",
-        "BHP / Ochrona środowiska": "bhp-ochrona-srodowiska",
-        "Budownictwo / Remonty / Geodezja": "budownictwo-architektura-geodezja",
-        "Doradztwo / Konsulting": "doradztwo-konsulting-audyt",
-        "Energetyka": "energetyka-energia-odnawialna",
-        "Nauka / Edukacja / Szkolenia": "edukacja-badania-naukowe-szkolenia-tlumaczenia",
-        "Finanse / Ekonomia / Księgowość": "ksiegowosc-ekonomia",
-        "Franczyza / Własny biznes": "franczyza-wlasny-biznes",
-        "Hotelarstwo / Gastronomia / Turystyka": "hotelarstwo-gastronomia-turystyka",
-        "HR": "hr-kadry",
-        "Internet / e-Commerce": "internet-e-commerce-nowe-media",
-        "Inżynieria": "inzynieria-technologia-technika",
-        "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "it-informatyka",
-        "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "telekomunikacja",
-        "Kadra kierownicza": "zarzadzanie-dyrekcja",
-        "Marketing i PR": "media-pr-reklama-marketing",
-        "Media / Sztuka / Rozrywka": "sztuka-rozrywka-kreacja-projektowanie",
-        "Motoryzacja": "motoryzacja",
-        "Motoryzacja": "serwis-montaz",
-        "Nieruchomości": "nieruchomosci",
-        "Obsługa klienta i call center": "obsluga-klienta-call-center",
-        "Praca fizyczna": "praca-fizyczna",
-        "Praktyki / staże": "praktyki-staze",
-        "Prawo": "prawo-i-administracja-panstwowa",
-        "Prace magazynowe": "magazyn",
-        "Produkcja": "produkcja-przemysl",
-        "Reklama / Grafika / Kreacja / Fotografia": "grafika-i-fotografia",
+        # "Administracja biurowa": "administracja-biurowa-praca-biurowa",
+        # "Badania i rozwój": "badania-i-rozwoj",
+        # "Bankowość": "bankowosc-finanse",
+        # "BHP / Ochrona środowiska": "bhp-ochrona-srodowiska",
+        # "Budownictwo / Remonty / Geodezja": "budownictwo-architektura-geodezja",
+        # "Doradztwo / Konsulting": "doradztwo-konsulting-audyt",
+        # "Energetyka": "energetyka-energia-odnawialna",
+        # "Nauka / Edukacja / Szkolenia": "edukacja-badania-naukowe-szkolenia-tlumaczenia",
+        # "Finanse / Ekonomia / Księgowość": "ksiegowosc-ekonomia",
+        # "Franczyza / Własny biznes": "franczyza-wlasny-biznes",
+        # "Hotelarstwo / Gastronomia / Turystyka": "hotelarstwo-gastronomia-turystyka",
+        # "HR": "hr-kadry",
+        # "Internet / e-Commerce": "internet-e-commerce-nowe-media",
+        # "Inżynieria": "inzynieria-technologia-technika",
+        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "it-informatyka",
+        # "IT / telekomunikacja / Rozwój oprogramowania / Administracja": "telekomunikacja",
+        # "Kadra kierownicza": "zarzadzanie-dyrekcja",
+        # "Marketing i PR": "media-pr-reklama-marketing",
+        # "Media / Sztuka / Rozrywka": "sztuka-rozrywka-kreacja-projektowanie",
+        # "Motoryzacja": "motoryzacja",
+        # "Motoryzacja": "serwis-montaz",
+        # "Nieruchomości": "nieruchomosci",
+        # "Obsługa klienta i call center": "obsluga-klienta-call-center",
+        # "Praca fizyczna": "praca-fizyczna",
+        # "Praktyki / staże": "praktyki-staze",
+        # "Prawo": "prawo-i-administracja-panstwowa",
+        # "Prace magazynowe": "magazyn",
+        # "Produkcja": "produkcja-przemysl",
+        # "Reklama / Grafika / Kreacja / Fotografia": "grafika-i-fotografia",
         "Rolnictwo i ogrodnictwo": "rolnictwo-hodowla",
         "Sektor publiczny": "sektor-publiczny-sluzby-mundurowe",
         "Sprzedaż": "sprzedaz-zakupy",
