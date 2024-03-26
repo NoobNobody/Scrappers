@@ -63,15 +63,13 @@ def create_category(category_name):
 
 def insert_offer_data(offer_data):
     try:
-        logging.info("Rozpoczynanie łączenia z bazą danych")
         connection = get_database_connection()
         cursor = connection.cursor()
-        logging.info("Połączenie z bazą danych nawiązane")
         
         cursor.execute("SELECT id FROM api_joboffers WHERE Position = ? AND Location = ?", (offer_data['Position'], offer_data['Location']))
         existing_offer = cursor.fetchone()
         if existing_offer:
-            logging.info("Oferta o podanym Stanowisku, Lokalizacji już istnieje w bazie danych")
+            logging.info("Ta oferta istnieje już w bazie danych")
             return
 
         website_result = get_website(offer_data['Website'])
@@ -86,13 +84,10 @@ def insert_offer_data(offer_data):
         else:
             category_id = category_result[0]
 
-        logging.info(f"Próba wstawienia danych oferty pracy: {offer_data['Position']}")
-
         values = [offer_data['Position'], website_id, category_id] + [offer_data.get(key) for key in ('Firm', 'Earnings', 'Location', 'Location_Latitude', 'Location_Longitude', 'Province', 'Min_Earnings', 'Max_Earnings', 'Average_Earnings', 'Earnings_Type', 'Date', 'Job_type', 'Working_hours', 'Job_model', 'Link')]
         insert_query = """INSERT INTO api_joboffers (Position, Website_id, Category_id, Firm, Earnings, Location, Location_Latitude,Location_Longitude, Province, Min_Earnings, Max_Earnings, Average_Earnings, Earnings_Type, Date, Job_type, Working_hours, Job_model, Link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
         cursor.execute(insert_query, tuple(values))
         connection.commit()
-        logging.info(f"Dane oferty pracy {offer_data['Position']} zostały pomyślnie wstawione do bazy danych.")
     except Exception as e:
         logging.error(f"Błąd podczas wstawiania danych oferty pracy: {e}")
     finally:

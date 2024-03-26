@@ -11,6 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from database_utils import insert_offer_data
+from helping_functions import get_location_details, get_province
 
 def transform_date(publication_date_text):
     if "dzisiaj" in publication_date_text.lower():
@@ -32,7 +33,10 @@ def scrapp(site_url):
 
     while True:
         page_url = f"{site_url}/portal/index.cbop#/listaOfert"
+
         driver.get(page_url)
+        logging.info(f"Aktualna strona: {page_url}")
+
         try:
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CLASS_NAME, 'oferta-pozycja-kontener-pozycji-min')))
         except TimeoutException:
@@ -55,7 +59,13 @@ def scrapp(site_url):
                 continue  
             position = position_element.get_text(strip=True)
 
-            location = (offer.find('span', class_='miejscePracyCzlonPierwszy').get_text(strip=True) + offer.find('span', class_='miejscePracyCzlonDrugi').get_text(strip=True)) if offer.find('span', class_='miejscePracyCzlonPierwszy') and offer.find('span', class_='miejscePracyCzlonDrugi') else None
+            location = offer.find('span', class_='miejscePracyCzlonPierwszy').get_text(strip=True) if offer.find('span', class_='miejscePracyCzlonPierwszy') else None
+
+            if location:
+                location = location.rstrip(',')
+
+            location_details = get_location_details(location)
+            province = get_province(location)
 
             job_type = offer.find('span', class_='skroconyRodzajZatrudnienia').get_text(strip=True) if offer.find('span', class_='skroconyRodzajZatrudnienia') else None
 
@@ -74,10 +84,13 @@ def scrapp(site_url):
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
                 return  
             elif check_date == yesterday:
-                logging.info("Przetwarzanie oferty z wczorajszą datą.")
+                logging.info(f"Oferta: Position: {position}, Location: {location}, Date: {publication_date}")
                 offer_data = {
                 "Position": position,
                 "Location": location,
+                "Location_Latitude": location_details['latitude'],
+                "Location_Longitude": location_details['longitude'],
+                "Province": province,
                 "Firm": firm,
                 "Job_type": job_type,
                 "Date": publication_date,
@@ -87,6 +100,7 @@ def scrapp(site_url):
                 "Category": "ofertzgov", 
                 }
                 insert_offer_data(offer_data)
+                logging.info("Wyslano do bazy danych!")
             else:
                 continue
 
@@ -99,7 +113,6 @@ def scrapp(site_url):
             "var nextPageButton = document.querySelector('button.oferta-lista-stronicowanie-nastepna-strona');"
             "if (nextPageButton) { nextPageButton.click(); }"
         )
-
     driver.quit()    
 
 

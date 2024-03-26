@@ -11,6 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from database_utils import insert_offer_data
+from helping_functions import get_earnings_type, get_location_details, get_province, parse_earnings
 
 def transform_date(publication_date):
     publication_date = publication_date.strip().lower()
@@ -45,7 +46,9 @@ def scrapp(site_url, category_name, category_path):
             page_url = f"{site_url}/praca/{category_path};b"
         else:
             page_url = f"{site_url}/praca/{category_path};b/{current_page};pg"
+
         driver.get(page_url)
+        logging.info(f"Aktualna strona: {page_url}")
 
         try:
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-v-20d44b47]')))
@@ -77,12 +80,18 @@ def scrapp(site_url, category_name, category_path):
             location_element = offer.find('div', class_='g-job-location')
             location = location_element.get_text(strip=True) if location_element else None
 
+            location_details = get_location_details(location)
+            province = get_province(location)
+
             earnings_element = offer.find('div', class_='g-job-salary')
             if earnings_element:
                 earnings_text = earnings_element.get_text(strip=True).split(" (zal. od typu umowy)")[0]
                 earnings = earnings_text
             else:
                 earnings = None
+
+            min_earnings, max_earnings, average_earnings, _ = parse_earnings(earnings)
+            earnings_type = get_earnings_type(min_earnings, max_earnings)
 
             divs = offer.find_all("div", class_="g-job-offer-tags")
             job_type = working_hours = job_model = None
@@ -103,14 +112,22 @@ def scrapp(site_url, category_name, category_path):
             publication_date = transform_date(publication_date_text)
 
             if publication_date == yesterday:
+                logging.info(f"Oferta: Position: {position}, Location: {location}, Earnings: {earnings}, Date: {publication_date}")
                 offer_data = {
                     "Position": position,
                     "Location": location,
+                    "Location_Latitude": location_details['latitude'],
+                    "Location_Longitude": location_details['longitude'],
+                    "Province": province,
                     "Firm": firm,
                     "Job_type": job_type,
                     "Job_model": job_model,
                     "Working_hours": working_hours,
                     "Earnings": earnings,
+                    "Min_Earnings": min_earnings,
+                    "Max_Earnings": max_earnings,
+                    "Average_Earnings": average_earnings,
+                    "Earnings_Type": earnings_type,
                     "Date": publication_date,
                     "Link": full_link,
                     "Website": site_url,
@@ -118,10 +135,15 @@ def scrapp(site_url, category_name, category_path):
                     "Category": category_name, 
                 }
                 insert_offer_data(offer_data)
+                logging.info("Wyslano do bazy danych!")
+
                 older_offers_counter = 0 
+
             elif publication_date < yesterday:
+                logging.info("Znaleziono ofertę starszą niż wczorajsza.")
                 older_offers_counter += 1
                 if older_offers_counter >= max_older_offers:
+                    logging.info("Przerwanie scrapowania tej kategorii.")
                     driver.quit()
                     return 
             else:

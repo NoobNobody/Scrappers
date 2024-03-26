@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from database_utils import insert_offer_data
+from helping_functions import get_location_details, get_province
 
 def transform_date(publication_date):
     try:
@@ -28,8 +29,10 @@ def scrapp(site_url, category_name, category_path):
 
     while True:
         page_url = f"{site_url}/pl/szukaj-pracy?page={current_page}&industries={category_path}"
+
         driver.get(page_url)
-        logging.info(f"Rozpoczęcie scrapowania strony: {page_url}")
+        logging.info(f"Aktualna strona: {page_url}")
+
         try:
             WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.card-body')))
         except TimeoutException:
@@ -48,6 +51,9 @@ def scrapp(site_url, category_name, category_path):
                 location = location_element.text.strip()
                 location = location.split(',')[0].strip()
 
+            location_details = get_location_details(location)
+            province = get_province(location)
+
             job_type_element = offer.select_one('.type')
             job_type = job_type_element.text.strip() if job_type_element else None
 
@@ -58,7 +64,6 @@ def scrapp(site_url, category_name, category_path):
             full_link = site_url + link
 
             check_date = datetime.strptime(publication_date, '%Y-%m-%d').date()
-            logging.info(f"Data: {check_date}")
 
             if check_date < yesterday:
                 logging.info("Znaleziono ofertę starszą niż wczorajsza, przerywanie przetwarzania tej strony.")
@@ -69,6 +74,9 @@ def scrapp(site_url, category_name, category_path):
                     "Position": position,
                     "Firm": "Manpower",
                     "Location": location,
+                    "Location_Latitude": location_details['latitude'],
+                    "Location_Longitude": location_details['longitude'],
+                    "Province": province,
                     "Job_type": job_type,
                     "Date": publication_date,
                     "Link": full_link,
@@ -77,6 +85,7 @@ def scrapp(site_url, category_name, category_path):
                     "Category": category_name, 
                 }
                 insert_offer_data(offer_data)
+                logging.info("Wyslano do bazy danych!")
             else:
                 continue
 
